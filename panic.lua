@@ -37,60 +37,24 @@ WakeUpAntInMine = function()
     ant.Hunt()
 end
 
-RadarDominance = function(player)
-    Media.Debug("Rader domination by " .. player.Name)
-end
+SendSniper = function()
+	local start = Map.CenterOfCell(CPos.New(31, 0)) + WVec.New(0, 0, Actor.CruiseAltitude("badr"))
+	local transport = Actor.Create("badr", true, { CenterPosition = start, Owner = creeps, Facing = (Map.CenterOfCell(wpSummit.Location) - start).Facing })
 
-function tablelength(T)
-    local count = 0
-    for _ in pairs(T) do count = count + 1 end
-    return count
-end
-
-function pairsByKeys(t, f)
-    local a = {}
-    for n in pairs(t) do table.insert(a, n) end
-    table.sort(a, f)
-    local i = 0  -- iterator variable
-    local iter = function ()  -- iterator function
-      i = i + 1
-      if a[i] == nil then return nil
-      else return a[i], t[a[i]]
-      end
-    end
-    return iter
-  end
-
-CheckDomeDominance = function()
-    -- determine new domeminee
-    local maxCount = 0
-    for player, count in pairsByKeys(NewPlayerDomes) do
-        Media.Debug(player .. ': ' .. count)
-    end
-end
-
-CheckDomeCount = function()
-    Media.Debug("checking " .. DomeCount)
-    local MaxCount = 0
-    local MaxPlayer = nil
-    Utils.Do(players, function(player)
-        local actors = player.GetActorsByType("dome")
-        local count = tablelength(actors)
-        NewPlayerDomes[player.InternalName] = count
-        if MaxCount < count then
-            MaxCount = count
-            MaxPlayer = player
-        end
+    local a = Actor.Create("sniper", false, { Owner = creeps })
+    transport.LoadPassenger(a)
+    
+    Trigger.OnPassengerExited(transport, function(t, p)
+        Trigger.OnIdle(p, p.Hunt)
     end)
 
-    CheckDomeDominance()
-
-    if MaxCount > DomeCount then
-        RadarDominance(MaxPlayer)
-    end
-
-    if MaxCount > 1 then DomeCount = MaxCount end
-    Trigger.AfterDelay(DateTime.Seconds(3), CheckDomeCount)
+	transport.Paradrop(wpSummit.Location)
+    
+    Trigger.OnKilled(a, function()
+        Trigger.AfterDelay(DateTime.Seconds(5), function()
+            SendSniper()
+        end)
+    end)
 end
 
 WorldLoaded = function()
@@ -132,18 +96,9 @@ WorldLoaded = function()
         WakeUpAntInMine()
     end)
 
-    Trigger.AfterDelay(DateTime.Seconds(20), function()
-        Media.Debug("Checking for Construction Yards...")
-        ConstructionYards = Utils.Where(Map.ActorsInWorld, function(self)
-            return self.Type == "dome"
-        end)
-        Utils.Do(ConstructionYards, function(actor)
-            local player = actor.Owner
-            Media.Debug(actor.Type .. " owned by " .. player.Name)
-        end)
+    Trigger.OnKilled(Refugee, function()
+        SendSniper()
     end)
-
-    Trigger.AfterDelay(DateTime.Seconds(6), CheckDomeCount)
 end
 
 ticked = 0

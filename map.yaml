@@ -668,4 +668,12 @@ Actors:
 	wpMineAnt: waypoint
 		Owner: Neutral
 		Location: 57,23
+	Refugee: c3
+		Owner: Neutral
+		Location: 32,34
+		SubCell: 3
+		Facing: 92
+	wpSummit: waypoint
+		Owner: Neutral
+		Location: 31,36
 Rules: rules.yaml
