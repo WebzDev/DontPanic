@@ -1,8 +1,10 @@
 Zombies = { "zombie", "zombie", "zombie", "zombie" }
+SniperTimings = { 60, 120, 180 }
+SniperKillCount = {}
 
 RetailiateBlasphemy = function()
     powerproxy = Actor.Create("powerproxy.parabombs", false, { Owner = creeps })
-	powerproxy.SendAirstrike(wpChurch.CenterPosition, false, Facing.West)
+    powerproxy.SendAirstrike(wpChurch.CenterPosition, false, Facing.West)
     powerproxy.Destroy()
 end
 
@@ -38,29 +40,55 @@ WakeUpAntInMine = function()
 end
 
 SendSniper = function()
-	local start = Map.CenterOfCell(CPos.New(31, 0)) + WVec.New(0, 0, Actor.CruiseAltitude("badr"))
-	local transport = Actor.Create("badr", true, { CenterPosition = start, Owner = creeps, Facing = (Map.CenterOfCell(wpSummit.Location) - start).Facing })
+    local start = Map.CenterOfCell(CPos.New(31, 0)) + WVec.New(0, 0, Actor.CruiseAltitude("badr"))
+    local transport = Actor.Create("badr", true, { CenterPosition = start, Owner = creeps, Facing = (Map.CenterOfCell(wpSummit.Location) - start).Facing })
 
-    local a = Actor.Create("sniper", false, { Owner = creeps })
-    transport.LoadPassenger(a)
-    
-    Trigger.OnPassengerExited(transport, function(t, p)
-        p.Stance = "AttackAnything"
-    end)
+    local sniper = Actor.Create("sniper", false, { Owner = creeps })
+    sniper.Stance = "AttackAnything"
+    transport.LoadPassenger(sniper)
 
-	transport.Paradrop(wpSummit.Location)
-    
-    Trigger.OnKilled(a, function()
-        Trigger.AfterDelay(DateTime.Seconds(60), function()
+    transport.Paradrop(wpSummit.Location)
+
+    Trigger.OnKilled(sniper, function(self, killer)
+        local killCount = SniperKillCount[killer.Owner.Name]
+        if killCount == nil then
+            SniperKillCount[killer.Owner.Name] = 1
+        elseif killCount > 4 then
+            SniperKillCount[killer.Owner.Name] = 3
+            GiftSniper(killer.Owner)
+        else
+            SniperKillCount[killer.Owner.Name] = killCount + 1
+        end
+
+        Trigger.AfterDelay(DateTime.Seconds(Utils.Random(SniperTimings)), function()
             SendSniper()
         end)
     end)
 end
 
+GiftSniper = function(owner)
+    local start = Map.CenterOfCell(Map.RandomEdgeCell()) + WVec.New(0, 0, Actor.CruiseAltitude("badr"))
+    local barr = owner.GetActorsByType("barr")[1]
+    local tent = owner.GetActorsByType("tent")[1]
+    local target = nil
+    if barr then
+        target = barr
+    elseif tent then
+        target = tent
+    end
+
+    if target then
+        local transport = Actor.Create("badr", true, { CenterPosition = start, Owner = owner, Facing = (Map.CenterOfCell(target.Location) - start).Facing })
+        local sniper = Actor.Create("sniper", false, { Owner = owner })
+        transport.LoadPassenger(sniper)
+        transport.Paradrop(target.Location)
+    end
+end
+
 WorldLoaded = function()
     creeps = Player.GetPlayer("Creeps")
     players = Player.GetPlayers(function(player)
-        return player.IsLocalPlayer or player.IsBot
+        return player.IsNonCombatant or player.IsBot
     end)
 
     Trigger.OnKilled(Church, function()
@@ -68,7 +96,7 @@ WorldLoaded = function()
     end)
 
     Trigger.OnKilled(OilPump, function()
-        InitiateZombieApocalipse()
+        Trigger.AfterDelay(DateTime.Seconds(2), InitiateZombieApocalipse)
     end)
 
     Trigger.OnKilled(DogKeeper, function()
